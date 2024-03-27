@@ -1,0 +1,816 @@
+File: Smart2.cpp
+#include <iostream>
+#include <unordered_map>
+#include <string>
+#include <fstream> // For file handling
+#include <sstream> // For string stream
+#include <cstdlib> // For rand() and srand()
+#include <ctime>   // For time()
+
+using namespace std;
+
+enum Choice
+{
+    ROCK,
+    PAPER,
+    SCISSORS
+};
+
+string choiceToString(Choice c)
+{
+    switch (c)
+    {
+    case ROCK:
+        return "Rock";
+    case PAPER:
+        return "Paper";
+    case SCISSORS:
+        return "Scissors";
+    default:
+        return "Unknown";
+    }
+}
+
+Choice charToChoice(char c)
+{
+    switch (c)
+    {
+    case 'R':
+        return ROCK;
+    case 'P':
+        return PAPER;
+    case 'S':
+        return SCISSORS;
+    default:
+        return ROCK; // Safe default
+    }
+}
+
+Choice winningChoiceAgainst(Choice c)
+{
+    switch (c)
+    {
+    case ROCK:
+        return PAPER;
+    case PAPER:
+        return SCISSORS;
+    case SCISSORS:
+        return ROCK;
+    default:
+        return ROCK; // Safe default
+    }
+}
+
+const int N = 5; // Lookback window for patterns
+string sequence;  // Stores the last N-1 moves
+unordered_map<string, unordered_map<char, int>> frequencyMap; // Frequency of patterns
+
+// Predicts the next move based on the pattern
+Choice predictNextMove()
+{
+    if (sequence.length() < N - 1)
+    {
+        // Not enough data for prediction
+        return static_cast<Choice>(rand() % 3);
+    }
+
+    string recentPattern = sequence.substr(sequence.length() - (N - 1));
+    if (frequencyMap.find(recentPattern) == frequencyMap.end())
+    {
+        // Pattern not found
+        return static_cast<Choice>(rand() % 3);
+    }
+
+    char mostLikelyMove;
+    int maxFrequency = -1;
+    for (auto &moveFreq : frequencyMap[recentPattern])
+    {
+        if (moveFreq.second > maxFrequency)
+        {
+            maxFrequency = moveFreq.second;
+            mostLikelyMove = moveFreq.first;
+        }
+    }
+
+    return charToChoice(mostLikelyMove);
+}
+
+// Updates the frequency map with the latest move
+void updateFrequencyMap(char move)
+{
+    if (sequence.length() == N - 1)
+    {
+        frequencyMap[sequence][move]++;
+    }
+    sequence += move;
+    if (sequence.length() > N - 1)
+    {
+        sequence.erase(sequence.begin());
+    }
+}
+
+// Determine the winner of each round
+int determineWinner(Choice userChoice, Choice computerChoice)
+{
+    if (userChoice == computerChoice)
+    {
+        return 0; // Draw
+    }
+    else if ((userChoice == ROCK && computerChoice == SCISSORS) ||
+             (userChoice == PAPER && computerChoice == ROCK) ||
+             (userChoice == SCISSORS && computerChoice == PAPER))
+    {
+        return 1; // User wins
+    }
+    else
+    {
+        return -1; // Computer wins
+    }
+}
+
+// Write frequencies to a file
+void writeFrequenciesToFile(const string &filename)
+{
+    ofstream file(filename);
+    if (file.is_open())
+    {
+        for (const auto &entry : frequencyMap)
+        {
+            file << entry.first << ": ";
+            for (const auto &moveFreq : entry.second)
+            {
+                file << moveFreq.first << ":" << moveFreq.second << ",";
+            }
+            file << endl;
+        }
+        file.close();
+    }
+    else
+    {
+        cerr << "Unable to open file: " << filename << endl;
+    }
+}
+
+// Read frequencies from a file
+void readFrequenciesFromFile(const string &filename)
+{
+    frequencyMap.clear(); // Clear the existing frequency map
+
+    ifstream file(filename);
+    if (file.is_open())
+    {
+        string line;
+        while (getline(file, line))
+        {
+            istringstream iss(line); // String stream to parse each line
+            string pattern;
+            getline(iss, pattern, ':');
+
+            unordered_map<char, int> moves;
+            string moveFreqPair;
+            while (getline(iss, moveFreqPair, ','))
+            {
+                char move;
+                int freq;
+                stringstream ss(moveFreqPair);
+                ss >> move;
+                ss.ignore();
+                ss >> freq;
+                moves[move] = freq;
+            }
+            frequencyMap[pattern] = moves;
+        }
+        file.close();
+    }
+    else
+    {
+        cerr << "Unable to open file: " << filename << endl;
+    }
+}
+
+int main()
+{
+    srand(static_cast<unsigned int>(time(nullptr))); // Seed for random number generation
+
+    // Read frequencies from file at the start of each game
+    readFrequenciesFromFile("frequencies.txt");
+
+    cout << "Rock, Paper, Scissors Game against the Computer!\n";
+    cout << "Enter R for Rock, P for Paper, S for Scissors, Q to quit:\n";
+
+    char userMove;
+    while (true)
+    {
+        cout << "> ";
+        cin >> userMove;
+        if (toupper(userMove) == 'Q')
+        {
+            // Write frequencies to file at the end of each game
+            writeFrequenciesToFile("frequencies.txt");
+            break; // Quit the game
+        }
+
+        Choice userChoice = charToChoice(toupper(userMove));
+        Choice predictedMove = predictNextMove();
+        Choice computerChoice = winningChoiceAgainst(predictedMove); // Computer plays to win against the predicted move
+
+        cout << "You chose " << choiceToString(userChoice) << ".\n";
+        cout << "Computer chose " << choiceToString(computerChoice) << ".\n";
+
+        // Update pattern recognition
+        updateFrequencyMap(toupper(userMove));
+
+        // Determine the winner and display the result
+        int winner = determineWinner(userChoice, computerChoice);
+        if (winner == 0)
+        {
+            cout << "It's a draw!\n";
+        }
+        else if (winner == 1)
+        {
+            cout << "You win!\n";
+        }
+        else
+        {
+            cout << "Computer wins!\n";
+        }
+    }
+
+    return 0;
+}
+
+
+File: Smart.cpp
+
+
+File: main.cpp
+#include <iostream>
+#include <memory>
+#include <cctype> // For std::toupper
+#include "include/GameEngine.h"
+#include "include/HumanPlayer.h"
+#include "include/RandomStrategy.h"
+#include "include/SmartStrategy.h"
+#include "include/Strategy.h"
+#include "include/Player.h"
+#include "include/FrequencyMap.h"
+#include "include/FileHandler.h"
+
+// Function to convert character input to Choice enum
+Choice charToChoice(char c) {
+    switch (std::toupper(c)) {
+        case 'R':
+            return ROCK;
+        case 'P':
+            return PAPER;
+        case 'S':
+            return SCISSORS;
+        default:
+            return ROCK; // Default choice
+    }
+}
+
+int main() {
+    std::cout << "Welcome to Rock-Paper-Scissors game!" << std::endl;
+    std::cout << "Choose a strategy for the computer player:" << std::endl;
+    std::cout << "1. Random strategy" << std::endl;
+    std::cout << "2. Smart strategy" << std::endl;
+    std::cout << "Enter your choice (1 or 2): ";
+    
+    int choice;
+    std::cin >> choice;
+    
+    std::unique_ptr<Strategy> strategy;
+    FileHandler fileHandler;
+    FrequencyMap frequencyMap;
+    
+    if (choice == 1) {
+        strategy = std::make_unique<RandomStrategy>();
+    } else if (choice == 2) {
+        fileHandler.readFrequenciesFromFile("frequencies.txt",frequencyMap.frequencyMap);
+        strategy = std::make_unique<SmartStrategy>(&frequencyMap);
+    } else {
+        std::cerr << "Invalid choice. Exiting the game." << std::endl;
+        return 1;
+    }
+
+    Player* computerPlayer = new ComputerPlayer(std::move(strategy));
+    
+    // Create human player object
+    HumanPlayer humanPlayer;
+    
+    // Create the game engine and start the game
+    GameEngine gameEngine(&humanPlayer, dynamic_cast<ComputerPlayer*>(computerPlayer));
+    gameEngine.startGame();
+    
+    for (int round = 1; round <= gameEngine.getTotalRounds(); ++round) {
+        char userInput;
+        std::cout << "\nPress R for Rock, P for Paper, S for Scissors, or Q to quit: ";
+        std::cin >> userInput;
+        userInput = std::toupper(userInput); // Convert input to uppercase
+        
+        if (userInput == 'Q') {
+            std::cout << "Exiting the game early." << std::endl;
+            break;
+        } else {
+            Choice userChoice = charToChoice(userInput);
+            gameEngine.playRound(userChoice);
+        }
+    }
+    
+    gameEngine.endGame();
+
+    
+    // End the game
+    gameEngine.endGame();
+    
+    // Clean up dynamically allocated memory
+    delete computerPlayer;
+    
+    return 0;
+}
+
+
+File: Strategy.h
+#ifndef STRATEGY_H
+#define STRATEGY_H
+
+#include "Choice.h"
+
+class Strategy{
+public:
+    virtual ~Strategy() = default;
+    virtual Choice makeChoice() = 0;
+};
+
+#endif
+
+File: SmartStrategy.h
+#ifndef SMARTSTRATEGY_H
+#define SMARTSTRATEGY_H
+
+#include "Strategy.h"
+#include "FrequencyMap.h"
+
+class SmartStrategy : public Strategy {
+public:
+    SmartStrategy(FrequencyMap* frequencyMap);
+    Choice makeChoice() override;
+    Choice winningChoiceAgainst(Choice choice);
+private:
+    FrequencyMap* frequencyMap;
+};
+
+#endif // SMARTSTRATEGY_H
+
+
+File: HumanPlayer.h
+#ifndef HUMANPLAYER_H
+#define HUMANPLAYER_H
+
+#include "Player.h"
+
+class HumanPlayer : public Player {
+public:
+    Choice makeMove() override;
+};
+
+#endif // HUMANPLAYER_H
+
+File: ChoiceUtils.h
+// ChoiceUtils.h
+#ifndef CHOICEUTILS_H
+#define CHOICEUTILS_H
+
+#include <string> 
+#include "Choice.h" // Include the header where Choice is defined
+
+Choice charToChoice(char c);
+
+std::string choiceToString(Choice c);
+
+#endif // CHOICEUTILS_H
+
+
+File: Choice.h
+#ifndef CHOICE_H
+#define CHOICE_H
+
+enum Choice {
+    ROCK,
+    PAPER,
+    SCISSORS,
+    QUIT
+};
+
+#endif // CHOICE_H
+
+
+File: Player.h
+#ifndef PLAYER_H
+#define PLAYER_H
+
+#include "Choice.h"
+
+class Player {
+public:
+    virtual Choice makeMove() = 0;
+};
+
+#endif // PLAYER_H
+
+
+File: FileHandler.h
+// file_handler.h
+
+#ifndef FILE_HANDLER_H
+#define FILE_HANDLER_H
+
+#include <string>
+#include <unordered_map>
+
+class FileHandler {
+public:
+    void writeFrequenciesToFile(const std::string& filename, const std::unordered_map<std::string, std::unordered_map<char, int>>& frequencyMap);
+    void readFrequenciesFromFile(const std::string& filename, std::unordered_map<std::string, std::unordered_map<char, int>>& frequencyMap);
+};
+
+#endif // FILE_HANDLER_H
+
+
+File: GameEngine.h
+#ifndef GAMEENGINE_H
+#define GAMEENGINE_H
+
+#include "Player.h"
+#include "ComputerPlayer.h"
+#include <iostream>
+
+class GameEngine {
+private:
+    Player* humanPlayer;
+    ComputerPlayer* computerPlayer;
+    int totalRounds = 0;
+    int currentRound = 0;
+    int humanWins = 0;
+    int computerWins = 0;
+    int ties = 0;
+
+public:
+    GameEngine(Player* human, ComputerPlayer* computer);
+    int determineWinner(Choice userChoice, Choice computerChoice);
+    void setTotalRounds(int rounds);
+    void startGame();
+    void playRound(Choice userChoice);
+    void endGame();
+    void displayCurrentScore();
+    static std::string choiceToString(Choice c);
+    int getTotalRounds() const;
+};
+
+#endif // GAMEENGINE_H
+
+
+File: ComputerPlayer.h
+#ifndef COMPUTERPLAYER_H
+#define COMPUTERPLAYER_H
+
+#include "Player.h"
+#include "Strategy.h"
+#include <memory>
+class ComputerPlayer : public Player {
+public:
+    ComputerPlayer(std::unique_ptr<Strategy> strategy);// Constructor that takes a strategy pointer
+    Choice makeMove() override; // Override the makeMove method
+
+private:
+    std::unique_ptr<Strategy> strategy; // Pointer to a strategy object
+};
+
+#endif // COMPUTERPLAYER_H
+
+
+File: RandomStrategy.h
+#ifndef RANDOMSTRATEGY_H
+#define RANDOMSTRATEGY_H
+
+#include "Strategy.h"
+
+class RandomStrategy : public Strategy {
+public:
+    RandomStrategy();
+    Choice makeChoice() override;
+};
+
+#endif // RANDOMSTRATEGY_H
+
+File: FrequencyMap.h
+#ifndef FREQUENCYMAP_H
+#define FREQUENCYMAP_H
+
+#include <unordered_map>
+#include "Choice.h"
+#include <string>
+
+class FrequencyMap {
+private:
+    const int N = 5; // Lookback window for patterns
+    std::string sequence;  // Stores the last N-1 moves
+    
+public:
+    void updateFrequencyMap(char move);
+    Choice predictNextMove();
+    std::unordered_map<std::string, std::unordered_map<char, int>> frequencyMap; // Frequency of patterns
+};
+
+#endif // FREQUENCYMAP_H
+
+
+File: randomStrategy.cpp
+#include "../include/RandomStrategy.h"
+#include <cstdlib>
+#include <ctime>
+
+RandomStrategy::RandomStrategy() {
+    // Initialize random seed
+    srand(static_cast<unsigned int>(time(nullptr)));
+}
+
+Choice RandomStrategy::makeChoice() {
+    // Implementation for making a random choice
+    return static_cast<Choice>(rand() % 3);
+}
+
+
+File: ChoiceUtils.cpp
+#include "../include/ChoiceUtils.h"
+#include <string>
+
+
+// Converts a Choice to its string representation
+std::string choiceToString(Choice c) {
+    switch (c) {
+    case ROCK:
+        return "Rock";
+    case PAPER:
+        return "Paper";
+    case SCISSORS:
+        return "Scissors";
+    default:
+        return "Unknown";
+    }
+}
+
+// Converts a character to a Choice
+Choice charToChoice(char c) {
+    switch (c) {
+    case 'R':
+        return ROCK;
+    case 'P':
+        return PAPER;
+    case 'S':
+        return SCISSORS;
+    default:
+        return ROCK; // Default to ROCK if the character is unrecognized
+    }
+}
+
+
+
+File: frequencyMap.cpp
+#include "../include/FrequencyMap.h"
+#include <cstdlib>
+#include <string>
+#include "../include/ChoiceUtils.h"
+
+void FrequencyMap::updateFrequencyMap(char move) {
+    if (sequence.length() == N - 1) {
+        frequencyMap[sequence][move]++;
+    }
+    sequence += move;
+    if (sequence.length() > N - 1) {
+        sequence.erase(sequence.begin());
+    }
+}
+
+Choice FrequencyMap::predictNextMove() {
+    if (sequence.length() < N - 1) {
+        // Not enough data for prediction
+        return static_cast<Choice>(rand() % 3);
+    }
+
+    std::string recentPattern = sequence.substr(sequence.length() - (N - 1));
+    if (frequencyMap.find(recentPattern) == frequencyMap.end()) {
+        // Pattern not found
+        return static_cast<Choice>(rand() % 3);
+    }
+
+    char mostLikelyMove;
+    int maxFrequency = -1;
+    for (auto &moveFreq : frequencyMap[recentPattern]) {
+        if (moveFreq.second > maxFrequency) {
+            maxFrequency = moveFreq.second;
+            mostLikelyMove = moveFreq.first;
+        }
+    }
+
+    return charToChoice(mostLikelyMove);
+}
+
+
+File: smartStrategy.cpp
+#include "../include/SmartStrategy.h"
+
+SmartStrategy::SmartStrategy(FrequencyMap* frequencyMap): frequencyMap(frequencyMap){}
+
+Choice SmartStrategy::makeChoice() {
+    Choice choice = frequencyMap->predictNextMove();
+    return winningChoiceAgainst(choice);
+
+}
+
+Choice SmartStrategy::winningChoiceAgainst(Choice choice) {
+    switch (choice) {
+    case ROCK:
+        return PAPER;
+    case PAPER:
+        return SCISSORS;
+    case SCISSORS:
+        return ROCK;
+    default:
+        return ROCK;
+    }
+}
+
+File: computerPlayer.cpp
+#include "../include/ComputerPlayer.h"
+#include "../include/Strategy.h"
+
+ComputerPlayer::ComputerPlayer(std::unique_ptr<Strategy> strategy)
+    : strategy(std::move(strategy)) {
+}
+
+// Use the strategy object to make a move
+Choice ComputerPlayer::makeMove() {
+    return strategy->makeChoice();
+}
+
+
+File: gameEngine.cpp
+#include "../include/GameEngine.h"
+#include <iostream>
+
+GameEngine::GameEngine(Player* human, ComputerPlayer* computer) : humanPlayer(human), computerPlayer(computer) {
+}
+
+void GameEngine::setTotalRounds(int rounds) {
+    this->totalRounds = rounds;
+}
+
+void GameEngine::startGame() {
+    std::cout << "Rock, Paper, Scissors Game against the Computer!\n";
+    std::cout << "Enter the number of rounds you want to play: ";
+    int rounds;
+    std::cin >> rounds;
+    setTotalRounds(rounds);
+}
+
+void GameEngine::playRound(Choice userChoice) {
+    currentRound++;
+    std::cout << "\nRound " << currentRound << " of " << totalRounds << std::endl;
+    
+    Choice computerChoice = computerPlayer->makeMove();
+    std::cout << "User chose: " << choiceToString(userChoice) << std::endl;
+    std::cout << "Computer chose: " << choiceToString(computerChoice) << std::endl;
+    
+    int winner = determineWinner(userChoice, computerChoice);
+    
+    if (winner == 0) {
+        std::cout << "It's a draw!\n";
+        ties++;
+    } else if (winner == 1) {
+        std::cout << "You win!\n";
+        humanWins++;
+    } else {
+        std::cout << "Computer wins!\n";
+        computerWins++;
+    }
+
+    displayCurrentScore();
+}
+
+void GameEngine::displayCurrentScore() {
+    std::cout << "Current Score after " << currentRound << " rounds: \n";
+    std::cout << "Human Wins: " << humanWins << "\n";
+    std::cout << "Computer Wins: " << computerWins << "\n";
+    std::cout << "Ties: " << ties << "\n";
+}
+
+void GameEngine::endGame() {
+    std::cout << "\nGame ended!\nFinal Score:\n";
+    displayCurrentScore();
+    // Any additional cleanup can be added here
+}
+
+int GameEngine::getTotalRounds() const {
+    return totalRounds;
+}
+
+int GameEngine::determineWinner(Choice userChoice, Choice computerChoice) {
+    // Check for a draw
+    if (userChoice == computerChoice) {
+        return 0; // Draw
+    }
+    
+    // Check for cases where the user wins
+    if ((userChoice == ROCK && computerChoice == SCISSORS) ||
+        (userChoice == PAPER && computerChoice == ROCK) ||
+        (userChoice == SCISSORS && computerChoice == PAPER)) {
+        return 1; // User wins
+    }
+
+    // If none of the above, computer wins
+    return -1; // Computer wins
+}
+
+
+File: humanPlayer.cpp
+#include "../include/HumanPlayer.h"
+#include <iostream>
+
+
+Choice HumanPlayer::makeMove() {
+    std::cout << "Enter your choice (R for Rock, P for Paper, S for Scissors): ";
+    char userInput;
+    std::cin >> userInput;
+    userInput = std::toupper(userInput);
+
+    switch (userInput) {
+        case 'R':
+            return ROCK;
+        case 'P':
+            return PAPER;
+        case 'S':
+            return SCISSORS;
+        default:
+            std::cerr << "Invalid choice. Defaulting to Rock." << std::endl;
+            return ROCK; // Default choice
+    }
+}
+
+
+File: fileHandler.cpp
+// file_handler.cpp
+
+#include "../include/FileHandler.h"
+#include <fstream>
+#include <sstream>
+#include <iostream>
+
+void FileHandler::writeFrequenciesToFile(const std::string& filename, const std::unordered_map<std::string, std::unordered_map<char, int>>& frequencyMap) {
+    std::ofstream file(filename);
+    if (file.is_open()) {
+        for (const auto& entry : frequencyMap) {
+            file << entry.first << ": ";
+            for (const auto& moveFreq : entry.second) {
+                file << moveFreq.first << ":" << moveFreq.second << ",";
+            }
+            file << std::endl;
+        }
+        file.close();
+    } else {
+        std::cerr << "Unable to open file: " << filename << std::endl;
+    }
+}
+
+void FileHandler::readFrequenciesFromFile(const std::string& filename, std::unordered_map<std::string, std::unordered_map<char, int>>& frequencyMap) {
+    frequencyMap.clear(); // Clear the existing frequency map
+
+    std::ifstream file(filename);
+    if (file.is_open()) {
+        std::string line;
+        while (std::getline(file, line)) {
+            std::istringstream iss(line);
+            std::string pattern;
+            std::getline(iss, pattern, ':');
+
+            std::unordered_map<char, int> moves;
+            std::string moveFreqPair;
+            while (std::getline(iss, moveFreqPair, ',')) {
+                char move;
+                int freq;
+                std::stringstream ss(moveFreqPair);
+                ss >> move;
+                ss.ignore();
+                ss >> freq;
+                moves[move] = freq;
+            }
+            frequencyMap[pattern] = moves;
+        }
+        file.close();
+    } else {
+        std::cerr << "Unable to open file: " << filename << std::endl;
+    }
+}
+
+

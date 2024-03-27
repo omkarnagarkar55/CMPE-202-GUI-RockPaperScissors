@@ -1,0 +1,8 @@
+.vscode/
+GameEngine.o
+HumanPlayer.o
+RandomStrategy.o
+SmartStrategy.o
+a
+main.o
+game
